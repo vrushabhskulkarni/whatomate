@@ -117,9 +117,22 @@
 }
 
 .chat-bubble-outgoing {
-  @apply bg-primary text-primary-foreground rounded-tr-none ml-auto;
+  @apply rounded-tr-none ml-auto bg-gray-900 text-white;
+}
+
+.dark .chat-bubble-outgoing {
+  background-color: hsl(var(--primary) / 0.36);
+  color: hsl(var(--foreground));
 }
 
 .chat-bubble-time {
-  @apply text-xs opacity-70 mt-1;
+  @apply text-xs mt-1;
+}
+
+.chat-bubble-time span {
+  @apply opacity-70;
+}
+
+.chat-bubble-time svg {
+  @apply opacity-100;
 }

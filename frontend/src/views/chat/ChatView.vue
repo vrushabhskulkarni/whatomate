@@ -373,11 +373,11 @@ function getMessageStatusIcon(status: string) {
 function getMessageStatusClass(status: string) {
   switch (status) {
     case 'read':
-      return 'text-blue-500'
+      return 'text-blue-400' // Bright blue for read
     case 'failed':
       return 'text-destructive'
     default:
-      return 'text-muted-foreground'
+      return 'text-muted-foreground' // Gray for sent/delivered
   }
 }
 
