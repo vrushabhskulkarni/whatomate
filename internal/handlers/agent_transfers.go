@@ -240,6 +240,25 @@ func (a *App) CreateAgentTransfer(r *fastglue.Request) error {
 	// Broadcast WebSocket notification
 	a.broadcastTransferCreated(&transfer, &contact)
 
+	// Dispatch webhook for transfer created
+	var agentIDStr *string
+	var agentName *string
+	if transfer.AgentID != nil {
+		idStr := transfer.AgentID.String()
+		agentIDStr = &idStr
+	}
+	a.DispatchWebhook(orgID, EventTransferCreated, TransferEventData{
+		TransferID:      transfer.ID.String(),
+		ContactID:       contact.ID.String(),
+		ContactPhone:    contact.PhoneNumber,
+		ContactName:     contact.ProfileName,
+		Source:          transfer.Source,
+		Reason:          transfer.Notes,
+		AgentID:         agentIDStr,
+		AgentName:       agentName,
+		WhatsAppAccount: transfer.WhatsAppAccount,
+	})
+
 	// Load relations for response
 	a.DB.Preload("Agent").First(&transfer, transfer.ID)
 
@@ -320,6 +339,20 @@ func (a *App) ResumeFromTransfer(r *fastglue.Request) error {
 	// Broadcast WebSocket notification
 	a.broadcastTransferResumed(&transfer)
 
+	// Get contact for webhook data
+	var contact models.Contact
+	a.DB.Where("id = ?", transfer.ContactID).First(&contact)
+
+	// Dispatch webhook for transfer resumed
+	a.DispatchWebhook(orgID, EventTransferResumed, TransferEventData{
+		TransferID:      transfer.ID.String(),
+		ContactID:       contact.ID.String(),
+		ContactPhone:    contact.PhoneNumber,
+		ContactName:     contact.ProfileName,
+		Source:          transfer.Source,
+		WhatsAppAccount: transfer.WhatsAppAccount,
+	})
+
 	return r.SendEnvelope(map[string]any{
 		"message": "Transfer resumed, chatbot is now active for this contact",
 	})
@@ -394,6 +427,35 @@ func (a *App) AssignAgentTransfer(r *fastglue.Request) error {
 
 	// Broadcast WebSocket notification
 	a.broadcastTransferAssigned(&transfer)
+
+	// Dispatch webhook for transfer assigned
+	var agentIDStr *string
+	var agentName *string
+	if targetAgentID != nil {
+		idStr := targetAgentID.String()
+		agentIDStr = &idStr
+		// Get agent name
+		var agent models.User
+		if a.DB.Where("id = ?", targetAgentID).First(&agent).Error == nil {
+			agentName = &agent.FullName
+		}
+	}
+	contactPhone := ""
+	contactName := ""
+	if transfer.Contact != nil {
+		contactPhone = transfer.Contact.PhoneNumber
+		contactName = transfer.Contact.ProfileName
+	}
+	a.DispatchWebhook(orgID, EventTransferAssigned, TransferEventData{
+		TransferID:      transfer.ID.String(),
+		ContactID:       transfer.ContactID.String(),
+		ContactPhone:    contactPhone,
+		ContactName:     contactName,
+		Source:          transfer.Source,
+		AgentID:         agentIDStr,
+		AgentName:       agentName,
+		WhatsAppAccount: transfer.WhatsAppAccount,
+	})
 
 	return r.SendEnvelope(map[string]any{
 		"message":  "Transfer assigned successfully",

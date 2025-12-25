@@ -512,6 +512,23 @@ func (a *App) sendWhatsAppMessage(account *models.WhatsAppAccount, contact *mode
 			"whatsapp_message_id": result.Messages[0].ID,
 		})
 		a.Log.Info("Message sent successfully", "message_id", result.Messages[0].ID, "to", contact.PhoneNumber)
+
+		// Dispatch webhook for message sent
+		var sentByUserID string
+		if message.SentByUserID != nil {
+			sentByUserID = message.SentByUserID.String()
+		}
+		a.DispatchWebhook(account.OrganizationID, EventMessageSent, MessageEventData{
+			MessageID:       message.ID.String(),
+			ContactID:       contact.ID.String(),
+			ContactPhone:    contact.PhoneNumber,
+			ContactName:     contact.ProfileName,
+			MessageType:     message.MessageType,
+			Content:         message.Content,
+			WhatsAppAccount: account.Name,
+			Direction:       "outgoing",
+			SentByUserID:    sentByUserID,
+		})
 	}
 }
 
@@ -790,4 +807,21 @@ func (a *App) uploadAndSendMediaMessage(waAccount *whatsapp.Account, account *mo
 	})
 
 	a.Log.Info("Media message sent", "message_id", message.ID, "wamid", wamID, "type", message.MessageType)
+
+	// Dispatch webhook for message sent
+	var sentByUserID string
+	if message.SentByUserID != nil {
+		sentByUserID = message.SentByUserID.String()
+	}
+	a.DispatchWebhook(account.OrganizationID, EventMessageSent, MessageEventData{
+		MessageID:       message.ID.String(),
+		ContactID:       contact.ID.String(),
+		ContactPhone:    contact.PhoneNumber,
+		ContactName:     contact.ProfileName,
+		MessageType:     message.MessageType,
+		Content:         caption,
+		WhatsAppAccount: account.Name,
+		Direction:       "outgoing",
+		SentByUserID:    sentByUserID,
+	})
 }

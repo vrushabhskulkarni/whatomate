@@ -141,6 +141,12 @@ const router = createRouter({
           name: 'api-keys',
           component: () => import('@/views/settings/APIKeysView.vue'),
           meta: { roles: ['admin'] }
+        },
+        {
+          path: 'settings/webhooks',
+          name: 'webhooks',
+          component: () => import('@/views/settings/WebhooksView.vue'),
+          meta: { roles: ['admin'] }
         }
       ]
     },

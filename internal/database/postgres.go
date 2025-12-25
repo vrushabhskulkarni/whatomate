@@ -52,6 +52,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.Organization{},
 		&models.User{},
 		&models.APIKey{},
+		&models.Webhook{},
 		&models.WhatsAppAccount{},
 		&models.Contact{},
 		&models.Message{},
@@ -120,6 +121,9 @@ func CreateIndexes(db *gorm.DB) error {
 		// Canned responses indexes
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_canned_responses_org_name ON canned_responses(organization_id, name)`,
 		`CREATE INDEX IF NOT EXISTS idx_canned_responses_active ON canned_responses(organization_id, is_active, usage_count DESC)`,
+
+		// Webhooks indexes
+		`CREATE INDEX IF NOT EXISTS idx_webhooks_org_active ON webhooks(organization_id, is_active)`,
 	}
 
 	for _, idx := range indexes {

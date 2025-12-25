@@ -81,7 +81,17 @@ func (a *App) processIncomingMessageFull(phoneNumberID string, msg IncomingTextM
 	}
 
 	// Get or create contact (always do this for all incoming messages)
-	contact := a.getOrCreateContact(account.OrganizationID, msg.From, profileName)
+	contact, isNewContact := a.getOrCreateContact(account.OrganizationID, msg.From, profileName)
+
+	// Dispatch webhook if new contact was created
+	if isNewContact {
+		a.DispatchWebhook(account.OrganizationID, EventContactCreated, ContactEventData{
+			ContactID:       contact.ID.String(),
+			ContactPhone:    contact.PhoneNumber,
+			ContactName:     contact.ProfileName,
+			WhatsAppAccount: account.Name,
+		})
+	}
 
 	// Get message content - handle text, button replies, list replies, and media
 	messageText := ""
@@ -636,7 +646,8 @@ func (a *App) sendInteractiveButtons(account *models.WhatsAppAccount, to, bodyTe
 }
 
 // getOrCreateContact finds or creates a contact for the phone number
-func (a *App) getOrCreateContact(orgID uuid.UUID, phoneNumber, profileName string) *models.Contact {
+// Returns the contact and a boolean indicating if the contact was newly created
+func (a *App) getOrCreateContact(orgID uuid.UUID, phoneNumber, profileName string) (*models.Contact, bool) {
 	var contact models.Contact
 	result := a.DB.Where("organization_id = ? AND phone_number = ?", orgID, phoneNumber).First(&contact)
 	if result.Error == nil {
@@ -644,7 +655,7 @@ func (a *App) getOrCreateContact(orgID uuid.UUID, phoneNumber, profileName strin
 		if profileName != "" && contact.ProfileName != profileName {
 			a.DB.Model(&contact).Update("profile_name", profileName)
 		}
-		return &contact
+		return &contact, false
 	}
 
 	// Create new contact
@@ -658,8 +669,9 @@ func (a *App) getOrCreateContact(orgID uuid.UUID, phoneNumber, profileName strin
 		a.Log.Error("Failed to create contact", "error", err)
 		// Try to fetch again in case of race condition
 		a.DB.Where("organization_id = ? AND phone_number = ?", orgID, phoneNumber).First(&contact)
+		return &contact, false
 	}
-	return &contact
+	return &contact, true
 }
 
 // getOrCreateSession finds an active session or creates a new one
@@ -1907,6 +1919,18 @@ func (a *App) saveIncomingMessage(account *models.WhatsAppAccount, contact *mode
 			},
 		})
 	}
+
+	// Dispatch webhook for incoming message
+	a.DispatchWebhook(account.OrganizationID, EventMessageIncoming, MessageEventData{
+		MessageID:       message.ID.String(),
+		ContactID:       contact.ID.String(),
+		ContactPhone:    contact.PhoneNumber,
+		ContactName:     contact.ProfileName,
+		MessageType:     msgType,
+		Content:         content,
+		WhatsAppAccount: account.Name,
+		Direction:       "incoming",
+	})
 }
 
 // isWithinBusinessHours checks if current time is within configured business hours

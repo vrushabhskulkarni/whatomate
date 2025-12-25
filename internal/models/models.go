@@ -140,6 +140,25 @@ func (APIKey) TableName() string {
 	return "api_keys"
 }
 
+// Webhook represents an outbound webhook configuration for integrations
+type Webhook struct {
+	BaseModel
+	OrganizationID uuid.UUID   `gorm:"type:uuid;index;not null" json:"organization_id"`
+	Name           string      `gorm:"size:255;not null" json:"name"`
+	URL            string      `gorm:"type:text;not null" json:"url"`
+	Events         StringArray `gorm:"type:jsonb;default:'[]'" json:"events"` // ["message.incoming", "transfer.created"]
+	Headers        JSONB       `gorm:"type:jsonb;default:'{}'" json:"headers"`
+	Secret         string      `gorm:"size:255" json:"-"` // For HMAC signature
+	IsActive       bool        `gorm:"default:true" json:"is_active"`
+
+	// Relations
+	Organization *Organization `gorm:"foreignKey:OrganizationID" json:"organization,omitempty"`
+}
+
+func (Webhook) TableName() string {
+	return "webhooks"
+}
+
 // WhatsAppAccount represents a WhatsApp Business Account
 type WhatsAppAccount struct {
 	BaseModel

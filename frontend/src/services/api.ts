@@ -271,4 +271,44 @@ export const organizationService = {
   }) => api.put('/org/settings', data)
 }
 
+export interface Webhook {
+  id: string
+  name: string
+  url: string
+  events: string[]
+  headers: Record<string, string>
+  is_active: boolean
+  has_secret: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface WebhookEvent {
+  value: string
+  label: string
+  description: string
+}
+
+export const webhooksService = {
+  list: () => api.get<{ webhooks: Webhook[]; available_events: WebhookEvent[] }>('/webhooks'),
+  get: (id: string) => api.get<Webhook>(`/webhooks/${id}`),
+  create: (data: {
+    name: string
+    url: string
+    events: string[]
+    headers?: Record<string, string>
+    secret?: string
+  }) => api.post<Webhook>('/webhooks', data),
+  update: (id: string, data: {
+    name?: string
+    url?: string
+    events?: string[]
+    headers?: Record<string, string>
+    secret?: string
+    is_active?: boolean
+  }) => api.put<Webhook>(`/webhooks/${id}`, data),
+  delete: (id: string) => api.delete(`/webhooks/${id}`),
+  test: (id: string) => api.post(`/webhooks/${id}/test`)
+}
+
 export default api
