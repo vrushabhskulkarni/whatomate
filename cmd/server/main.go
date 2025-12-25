@@ -63,17 +63,9 @@ func main() {
 
 	// Run migrations if requested
 	if *migrate {
-		lo.Info("Running database migrations...")
-		if err := database.AutoMigrate(db); err != nil {
-			lo.Fatal("Failed to run migrations", "error", err)
+		if err := database.RunMigrationWithProgress(db); err != nil {
+			lo.Fatal("Migration failed", "error", err)
 		}
-		if err := database.CreateIndexes(db); err != nil {
-			lo.Fatal("Failed to create indexes", "error", err)
-		}
-		if err := database.CreateDefaultAdmin(db); err != nil {
-			lo.Fatal("Failed to create default admin", "error", err)
-		}
-		lo.Info("Migrations completed successfully")
 	}
 
 	// Connect to Redis

@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,6 +13,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
+
 
 // NewPostgres creates a new PostgreSQL connection
 func NewPostgres(cfg *config.DatabaseConfig, debug bool) (*gorm.DB, error) {
@@ -45,38 +47,148 @@ func NewPostgres(cfg *config.DatabaseConfig, debug bool) (*gorm.DB, error) {
 	return db, nil
 }
 
-// AutoMigrate runs auto migration for all models
-func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(
+// MigrationModel holds model info for migration progress
+type MigrationModel struct {
+	Name  string
+	Model interface{}
+}
+
+// GetMigrationModels returns all models to migrate with their names
+func GetMigrationModels() []MigrationModel {
+	return []MigrationModel{
 		// Core models
-		&models.Organization{},
-		&models.User{},
-		&models.APIKey{},
-		&models.Webhook{},
-		&models.WhatsAppAccount{},
-		&models.Contact{},
-		&models.Message{},
-		&models.Template{},
-		&models.WhatsAppFlow{},
+		{"Organization", &models.Organization{}},
+		{"User", &models.User{}},
+		{"APIKey", &models.APIKey{}},
+		{"Webhook", &models.Webhook{}},
+		{"WhatsAppAccount", &models.WhatsAppAccount{}},
+		{"Contact", &models.Contact{}},
+		{"Message", &models.Message{}},
+		{"Template", &models.Template{}},
+		{"WhatsAppFlow", &models.WhatsAppFlow{}},
 
 		// Bulk & Notifications
-		&models.BulkMessageCampaign{},
-		&models.BulkMessageRecipient{},
-		&models.NotificationRule{},
+		{"BulkMessageCampaign", &models.BulkMessageCampaign{}},
+		{"BulkMessageRecipient", &models.BulkMessageRecipient{}},
+		{"NotificationRule", &models.NotificationRule{}},
 
 		// Chatbot models
-		&models.ChatbotSettings{},
-		&models.KeywordRule{},
-		&models.ChatbotFlow{},
-		&models.ChatbotFlowStep{},
-		&models.ChatbotSession{},
-		&models.ChatbotSessionMessage{},
-		&models.AIContext{},
-		&models.AgentTransfer{},
+		{"ChatbotSettings", &models.ChatbotSettings{}},
+		{"KeywordRule", &models.KeywordRule{}},
+		{"ChatbotFlow", &models.ChatbotFlow{}},
+		{"ChatbotFlowStep", &models.ChatbotFlowStep{}},
+		{"ChatbotSession", &models.ChatbotSession{}},
+		{"ChatbotSessionMessage", &models.ChatbotSessionMessage{}},
+		{"AIContext", &models.AIContext{}},
+		{"AgentTransfer", &models.AgentTransfer{}},
 
 		// Canned responses
-		&models.CannedResponse{},
-	)
+		{"CannedResponse", &models.CannedResponse{}},
+	}
+}
+
+// AutoMigrate runs auto migration for all models (silent mode)
+func AutoMigrate(db *gorm.DB) error {
+	migrationModels := GetMigrationModels()
+	for _, m := range migrationModels {
+		if err := db.AutoMigrate(m.Model); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RunMigrationWithProgress runs migrations with a progress bar display
+func RunMigrationWithProgress(db *gorm.DB) error {
+	// Silence GORM logging during migration
+	silentDB := db.Session(&gorm.Session{Logger: logger.Default.LogMode(logger.Silent)})
+
+	migrationModels := GetMigrationModels()
+	indexes := getIndexes()
+
+	// Total steps: models + indexes + default admin check
+	totalSteps := len(migrationModels) + len(indexes) + 1
+	currentStep := 0
+	barWidth := 40
+
+	printProgress := func(step int, total int) {
+		percent := float64(step) / float64(total)
+		filled := int(percent * float64(barWidth))
+		empty := barWidth - filled
+
+		bar := repeatChar("█", filled) + "\033[90m" + repeatChar("░", empty) + "\033[0m"
+		fmt.Printf("\r  Running migrations  %s %3d%%", bar, int(percent*100))
+		os.Stdout.Sync()
+	}
+
+	fmt.Println()
+
+	// Migrate models
+	for _, m := range migrationModels {
+		printProgress(currentStep, totalSteps)
+		if err := silentDB.AutoMigrate(m.Model); err != nil {
+			fmt.Printf("\n  \033[31m✗ Migration failed: %s\033[0m\n\n", m.Name)
+			return fmt.Errorf("failed to migrate %s: %w", m.Name, err)
+		}
+		currentStep++
+	}
+
+	// Create indexes
+	for _, idx := range indexes {
+		printProgress(currentStep, totalSteps)
+		if err := silentDB.Exec(idx).Error; err != nil {
+			fmt.Printf("\n  \033[31m✗ Index creation failed\033[0m\n\n")
+			return fmt.Errorf("failed to create index: %w", err)
+		}
+		currentStep++
+	}
+
+	// Create default admin
+	printProgress(currentStep, totalSteps)
+	if err := CreateDefaultAdmin(silentDB); err != nil {
+		fmt.Printf("\n  \033[31m✗ Setup failed\033[0m\n\n")
+		return err
+	}
+	currentStep++
+
+	printProgress(currentStep, totalSteps)
+	fmt.Printf("\n  \033[32m✓ Migration completed\033[0m\n\n")
+
+	return nil
+}
+
+// repeatChar repeats a character n times
+func repeatChar(char string, n int) string {
+	result := ""
+	for i := 0; i < n; i++ {
+		result += char
+	}
+	return result
+}
+
+// getIndexes returns all index creation SQL statements
+func getIndexes() []string {
+	return []string{
+		`CREATE INDEX IF NOT EXISTS idx_messages_contact_created ON messages(contact_id, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_org_phone ON contacts(organization_id, phone_number)`,
+		`CREATE INDEX IF NOT EXISTS idx_contacts_assigned_read ON contacts(assigned_user_id, is_read)`,
+		`CREATE INDEX IF NOT EXISTS idx_sessions_phone_status ON chatbot_sessions(organization_id, phone_number, status)`,
+		`CREATE INDEX IF NOT EXISTS idx_keyword_rules_priority ON keyword_rules(organization_id, is_enabled, priority DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_agent_transfers_active ON agent_transfers(organization_id, phone_number, status)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_whatsapp_accounts_org_phone ON whatsapp_accounts(organization_id, phone_id)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_templates_account_name_lang ON templates(whats_app_account, name, language)`,
+		`CREATE INDEX IF NOT EXISTS idx_keyword_rules_account ON keyword_rules(whats_app_account, is_enabled, priority DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_chatbot_flows_account ON chatbot_flows(whats_app_account, is_enabled)`,
+		`CREATE INDEX IF NOT EXISTS idx_ai_contexts_account ON ai_contexts(whats_app_account, is_enabled, priority DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_bulk_campaigns_account ON bulk_message_campaigns(whats_app_account, status)`,
+		`CREATE INDEX IF NOT EXISTS idx_notification_rules_account ON notification_rules(whats_app_account, is_enabled)`,
+		`CREATE INDEX IF NOT EXISTS idx_messages_account ON messages(whats_app_account, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_contacts_account ON contacts(whats_app_account)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_canned_responses_org_name ON canned_responses(organization_id, name)`,
+		`CREATE INDEX IF NOT EXISTS idx_canned_responses_active ON canned_responses(organization_id, is_active, usage_count DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_webhooks_org_active ON webhooks(organization_id, is_active)`,
+	}
 }
 
 // CreateIndexes creates additional indexes not handled by GORM tags
