@@ -200,15 +200,22 @@ func (a *App) CreateAgentTransfer(r *fastglue.Request) error {
 		if err != nil {
 			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid agent_id", nil, "")
 		}
-		// Verify agent exists
+		// Verify agent exists and is available
 		var agent models.User
 		if err := a.DB.Where("id = ? AND organization_id = ?", parsedAgentID, orgID).First(&agent).Error; err != nil {
 			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Agent not found", nil, "")
 		}
+		if !agent.IsAvailable {
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Agent is currently away", nil, "")
+		}
 		agentID = &parsedAgentID
 	} else if settings.AssignToSameAgent && contact.AssignedUserID != nil {
-		// Auto-assign to contact's existing assigned agent (if setting enabled)
-		agentID = contact.AssignedUserID
+		// Auto-assign to contact's existing assigned agent (if setting enabled and agent is available)
+		var assignedAgent models.User
+		if a.DB.Where("id = ?", contact.AssignedUserID).First(&assignedAgent).Error == nil && assignedAgent.IsAvailable {
+			agentID = contact.AssignedUserID
+		}
+		// If agent is not available, falls through to queue (agentID remains nil)
 	}
 	// Otherwise, agentID remains nil (goes to queue)
 
@@ -425,10 +432,13 @@ func (a *App) AssignAgentTransfer(r *fastglue.Request) error {
 			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid agent_id", nil, "")
 		}
 
-		// Verify agent exists
+		// Verify agent exists and is available
 		var agent models.User
 		if err := a.DB.Where("id = ? AND organization_id = ?", parsedAgentID, orgID).First(&agent).Error; err != nil {
 			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Agent not found", nil, "")
+		}
+		if !agent.IsAvailable {
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Agent is currently away", nil, "")
 		}
 		targetAgentID = &parsedAgentID
 	} else if req.AgentID == nil && role == "agent" {
@@ -725,7 +735,12 @@ func (a *App) createTransferFromKeyword(account *models.WhatsAppAccount, contact
 	// Determine agent assignment
 	var agentID *uuid.UUID
 	if settings.AssignToSameAgent && contact.AssignedUserID != nil {
-		agentID = contact.AssignedUserID
+		// Check if the assigned agent is available
+		var assignedAgent models.User
+		if a.DB.Where("id = ?", contact.AssignedUserID).First(&assignedAgent).Error == nil && assignedAgent.IsAvailable {
+			agentID = contact.AssignedUserID
+		}
+		// If agent is not available, falls through to queue (agentID remains nil)
 	}
 
 	// Create transfer

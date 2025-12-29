@@ -286,6 +286,7 @@ func CreateDefaultAdmin(db *gorm.DB) error {
 		FullName:       "Admin",
 		Role:           "admin",
 		IsActive:       true,
+		IsAvailable:    true,
 		Settings:       models.JSONB{},
 	}
 	if err := db.Create(&admin).Error; err != nil {

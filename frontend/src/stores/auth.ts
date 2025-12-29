@@ -16,6 +16,7 @@ export interface User {
   organization_id: string
   organization_name?: string
   settings?: UserSettings
+  is_available?: boolean
 }
 
 export interface AuthState {
@@ -33,6 +34,7 @@ export const useAuthStore = defineStore('auth', () => {
   const userRole = computed(() => user.value?.role || 'agent')
   const organizationId = computed(() => user.value?.organization_id || '')
   const userSettings = computed(() => user.value?.settings || {})
+  const isAvailable = computed(() => user.value?.is_available ?? true)
 
   function setAuth(authData: { user: User; access_token: string; refresh_token: string }) {
     user.value = authData.user
@@ -119,6 +121,13 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function setAvailability(available: boolean) {
+    if (user.value) {
+      user.value = { ...user.value, is_available: available }
+      localStorage.setItem('user', JSON.stringify(user.value))
+    }
+  }
+
   return {
     user,
     token,
@@ -127,12 +136,14 @@ export const useAuthStore = defineStore('auth', () => {
     userRole,
     organizationId,
     userSettings,
+    isAvailable,
     setAuth,
     clearAuth,
     restoreSession,
     login,
     register,
     logout,
-    refreshAccessToken
+    refreshAccessToken,
+    setAvailability
   }
 })

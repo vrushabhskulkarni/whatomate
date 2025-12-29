@@ -2,10 +2,13 @@
 import { ref, computed } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usersService } from '@/services/api'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Switch } from '@/components/ui/switch'
+import { Badge } from '@/components/ui/badge'
 import {
   Popover,
   PopoverContent,
@@ -35,6 +38,7 @@ import {
   BarChart3
 } from 'lucide-vue-next'
 import { useColorMode } from '@/composables/useColorMode'
+import { toast } from 'vue-sonner'
 import { getInitials } from '@/lib/utils'
 
 const route = useRoute()
@@ -42,7 +46,27 @@ const router = useRouter()
 const authStore = useAuthStore()
 const isCollapsed = ref(false)
 const isUserMenuOpen = ref(false)
+const isUpdatingAvailability = ref(false)
 const { colorMode, isDark, setColorMode } = useColorMode()
+
+const handleAvailabilityChange = async (checked: boolean) => {
+  isUpdatingAvailability.value = true
+  try {
+    await usersService.updateAvailability(checked)
+    authStore.setAvailability(checked)
+    toast.success(checked ? 'Available' : 'Away', {
+      description: checked
+        ? 'You are now available to receive transfers'
+        : 'You will not receive new transfer assignments'
+    })
+  } catch (error) {
+    toast.error('Error', {
+      description: 'Failed to update availability'
+    })
+  } finally {
+    isUpdatingAvailability.value = false
+  }
+}
 
 // Define all navigation items with role requirements
 const allNavItems = [
@@ -247,6 +271,21 @@ const handleLogout = async () => {
           </PopoverTrigger>
           <PopoverContent side="top" align="start" class="w-52 p-1.5">
             <div class="text-xs font-medium px-2 py-1 text-muted-foreground">My Account</div>
+            <Separator class="my-1" />
+            <!-- Availability Toggle -->
+            <div class="flex items-center justify-between px-2 py-1.5">
+              <div class="flex items-center gap-2">
+                <span class="text-[13px]">Status</span>
+                <Badge :variant="authStore.isAvailable ? 'default' : 'secondary'" class="text-[10px] px-1.5 py-0">
+                  {{ authStore.isAvailable ? 'Available' : 'Away' }}
+                </Badge>
+              </div>
+              <Switch
+                :checked="authStore.isAvailable"
+                :disabled="isUpdatingAvailability"
+                @update:checked="handleAvailabilityChange"
+              />
+            </div>
             <Separator class="my-1" />
             <RouterLink to="/profile">
               <Button

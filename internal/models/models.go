@@ -110,6 +110,7 @@ type User struct {
 	Role           string    `gorm:"size:50;default:'agent'" json:"role"` // admin, manager, agent
 	Settings       JSONB     `gorm:"type:jsonb;default:'{}'" json:"settings"`
 	IsActive       bool      `gorm:"default:true" json:"is_active"`
+	IsAvailable    bool      `gorm:"default:true" json:"is_available"` // Agent availability status (away/available)
 
 	// Relations
 	Organization *Organization `gorm:"foreignKey:OrganizationID" json:"organization,omitempty"`

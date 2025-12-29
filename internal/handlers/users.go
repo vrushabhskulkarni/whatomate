@@ -24,6 +24,7 @@ type UserResponse struct {
 	FullName       string        `json:"full_name"`
 	Role           string        `json:"role"`
 	IsActive       bool          `json:"is_active"`
+	IsAvailable    bool          `json:"is_available"`
 	OrganizationID uuid.UUID     `json:"organization_id"`
 	Settings       models.JSONB  `json:"settings,omitempty"`
 	CreatedAt      string        `json:"created_at"`
@@ -404,9 +405,51 @@ func userToResponse(user models.User) UserResponse {
 		FullName:       user.FullName,
 		Role:           user.Role,
 		IsActive:       user.IsActive,
+		IsAvailable:    user.IsAvailable,
 		OrganizationID: user.OrganizationID,
 		Settings:       user.Settings,
 		CreatedAt:      user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:      user.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
+}
+
+// AvailabilityRequest represents the request body for updating availability
+type AvailabilityRequest struct {
+	IsAvailable bool `json:"is_available"`
+}
+
+// UpdateAvailability updates the current user's availability status (away/available)
+func (a *App) UpdateAvailability(r *fastglue.Request) error {
+	userID, ok := r.RequestCtx.UserValue("user_id").(uuid.UUID)
+	if !ok {
+		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, "Unauthorized", nil, "")
+	}
+
+	var user models.User
+	if err := a.DB.Where("id = ?", userID).First(&user).Error; err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusNotFound, "User not found", nil, "")
+	}
+
+	var req AvailabilityRequest
+	if err := r.Decode(&req, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid request body", nil, "")
+	}
+
+	user.IsAvailable = req.IsAvailable
+
+	if err := a.DB.Save(&user).Error; err != nil {
+		a.Log.Error("Failed to update availability", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, "Failed to update availability", nil, "")
+	}
+
+	status := "available"
+	if !req.IsAvailable {
+		status = "away"
+	}
+
+	return r.SendEnvelope(map[string]interface{}{
+		"message":      "Availability updated successfully",
+		"is_available": user.IsAvailable,
+		"status":       status,
+	})
 }

@@ -96,7 +96,9 @@ export const usersService = {
   updateSettings: (data: { email_notifications: boolean; new_message_alerts: boolean; campaign_updates: boolean }) =>
     api.put('/me/settings', data),
   changePassword: (data: { current_password: string; new_password: string }) =>
-    api.put('/me/password', data)
+    api.put('/me/password', data),
+  updateAvailability: (isAvailable: boolean) =>
+    api.put('/me/availability', { is_available: isAvailable })
 }
 
 export const apiKeysService = {
