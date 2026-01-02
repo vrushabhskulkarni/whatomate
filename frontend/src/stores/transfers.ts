@@ -104,13 +104,10 @@ export const useTransfersStore = defineStore('transfers', () => {
     isLoading.value = true
     try {
       const response = await chatbotService.listTransfers(params)
-      console.log('Transfers API response:', response.data)
       const data = response.data.data || response.data
-      console.log('Parsed transfers data:', data)
       transfers.value = data.transfers || []
       generalQueueCount.value = data.general_queue_count ?? 0
       teamQueueCounts.value = data.team_queue_counts ?? {}
-      console.log('General queue:', generalQueueCount.value, 'Team queues:', teamQueueCounts.value, 'Transfers:', transfers.value.length)
     } catch (error) {
       console.error('Failed to fetch transfers:', error)
     } finally {
@@ -139,14 +136,17 @@ export const useTransfersStore = defineStore('transfers', () => {
     }
   }
 
-  function updateTransfer(id: string, updates: Partial<AgentTransfer>) {
+  function updateTransfer(id: string, updates: Partial<AgentTransfer>): boolean {
     // Mark as synced via WebSocket
     lastSyncedAt.value = Date.now()
 
     const index = transfers.value.findIndex(t => t.id === id)
     if (index !== -1) {
       const oldTransfer = transfers.value[index]
-      transfers.value[index] = { ...oldTransfer, ...updates }
+      const updatedTransfer = { ...oldTransfer, ...updates }
+
+      // Use splice for proper Vue reactivity (array element replacement)
+      transfers.value.splice(index, 1, updatedTransfer)
 
       // Update queue count if assignment changed
       if (updates.agent_id !== undefined) {
@@ -176,7 +176,11 @@ export const useTransfersStore = defineStore('transfers', () => {
           generalQueueCount.value = Math.max(0, generalQueueCount.value - 1)
         }
       }
+
+      return true
     }
+
+    return false
   }
 
   function removeTransfer(id: string) {

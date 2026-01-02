@@ -260,11 +260,10 @@ class WebSocketService {
   }
 
   private handleAgentTransfer(payload: any) {
-    console.log('WebSocket: handleAgentTransfer received', payload)
     const transfersStore = useTransfersStore()
     const authStore = useAuthStore()
 
-    // Add transfer to store
+    // Add transfer to store with default SLA values
     transfersStore.addTransfer({
       id: payload.id,
       contact_id: payload.contact_id,
@@ -274,9 +273,16 @@ class WebSocketService {
       status: payload.status,
       source: payload.source || 'manual',
       agent_id: payload.agent_id,
+      team_id: payload.team_id,
       notes: payload.notes,
-      transferred_at: payload.transferred_at
+      transferred_at: payload.transferred_at,
+      // Default SLA values - will be updated on next fetch
+      sla_breached: false,
+      escalation_level: 0
     })
+
+    // Refresh to get complete data including SLA fields
+    transfersStore.fetchTransfers()
 
     // Show toast notification for admin/manager or assigned agent
     const userRole = authStore.user?.role
@@ -299,21 +305,30 @@ class WebSocketService {
   private handleAgentTransferResume(payload: any) {
     const transfersStore = useTransfersStore()
 
-    transfersStore.updateTransfer(payload.id, {
+    const updated = transfersStore.updateTransfer(payload.id, {
       status: payload.status,
       resumed_at: payload.resumed_at,
       resumed_by: payload.resumed_by
     })
+
+    // If transfer wasn't found in store, refresh to get latest data
+    if (!updated) {
+      transfersStore.fetchTransfers()
+    }
   }
 
   private handleAgentTransferAssign(payload: any) {
     const transfersStore = useTransfersStore()
     const authStore = useAuthStore()
 
+    // Try to update existing transfer
     transfersStore.updateTransfer(payload.id, {
       agent_id: payload.agent_id,
       team_id: payload.team_id
     })
+
+    // Always refresh to ensure UI is in sync (queue counts, etc.)
+    transfersStore.fetchTransfers()
 
     // Notify if assigned to current user
     const currentUserId = authStore.user?.id

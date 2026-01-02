@@ -52,6 +52,7 @@ import {
 import { useColorMode } from '@/composables/useColorMode'
 import { toast } from 'vue-sonner'
 import { getInitials } from '@/lib/utils'
+import { wsService } from '@/services/websocket'
 
 const route = useRoute()
 const router = useRouter()
@@ -166,12 +167,18 @@ watch(() => authStore.isAvailable, (available) => {
   }
 }, { immediate: true })
 
-// Restore break time on mount
+// Restore break time on mount and connect WebSocket
 onMounted(() => {
   authStore.restoreBreakTime()
   if (!authStore.isAvailable && authStore.breakStartedAt) {
     updateBreakDuration()
     breakTimerInterval = setInterval(updateBreakDuration, 60000)
+  }
+
+  // Connect WebSocket for real-time updates across all pages
+  const token = localStorage.getItem('auth_token')
+  if (token) {
+    wsService.connect(token)
   }
 })
 

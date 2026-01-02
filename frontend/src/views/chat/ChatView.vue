@@ -153,15 +153,7 @@ const filteredAssignableUsers = computed(() => {
   )
 })
 
-// Initialize WebSocket connection
-function initWebSocket() {
-  const token = localStorage.getItem('auth_token')
-  if (token) {
-    wsService.connect(token)
-  }
-}
-
-// Fetch contacts on mount and connect WebSocket
+// Fetch contacts on mount (WebSocket is connected in AppLayout)
 onMounted(async () => {
   // Ensure auth session is restored
   if (!authStore.isAuthenticated) {
@@ -169,7 +161,6 @@ onMounted(async () => {
   }
 
   await contactsStore.fetchContacts()
-  initWebSocket()
 
   // Fetch transfers to track active transfers
   transfersStore.fetchTransfers({ status: 'active' })
