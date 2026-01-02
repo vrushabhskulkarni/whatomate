@@ -52,6 +52,7 @@ const WS_TYPE_REACTION_UPDATE = 'reaction_update'
 const WS_TYPE_AGENT_TRANSFER = 'agent_transfer'
 const WS_TYPE_AGENT_TRANSFER_RESUME = 'agent_transfer_resume'
 const WS_TYPE_AGENT_TRANSFER_ASSIGN = 'agent_transfer_assign'
+const WS_TYPE_TRANSFER_ESCALATION = 'transfer_escalation'
 
 interface WSMessage {
   type: string
@@ -141,6 +142,9 @@ class WebSocketService {
           break
         case WS_TYPE_AGENT_TRANSFER_ASSIGN:
           this.handleAgentTransferAssign(message.payload)
+          break
+        case WS_TYPE_TRANSFER_ESCALATION:
+          this.handleTransferEscalation(message.payload)
           break
         case WS_TYPE_REACTION_UPDATE:
           this.handleReactionUpdate(store, message.payload)
@@ -307,6 +311,37 @@ class WebSocketService {
       toast.info('Transfer Assigned', {
         description: 'A transfer has been assigned to you',
         duration: 5000,
+        action: {
+          label: 'View',
+          onClick: () => router.push('/chatbot/transfers')
+        }
+      })
+    }
+  }
+
+  private handleTransferEscalation(payload: any) {
+    const authStore = useAuthStore()
+    const currentUserId = authStore.user?.id
+
+    // Check if current user should be notified
+    const notifyIds: string[] = payload.escalation_notify_ids || []
+    const shouldNotify = notifyIds.includes(currentUserId || '')
+
+    // Also notify admins/managers
+    const userRole = authStore.user?.role
+    const isAdminOrManager = userRole === 'admin' || userRole === 'manager'
+
+    if (shouldNotify || isAdminOrManager) {
+      const levelName = payload.level_name === 'critical' ? 'Critical' : 'Warning'
+      const contactName = payload.contact_name || payload.phone_number
+
+      // Play notification sound
+      playNotificationSound()
+
+      // Show urgent toast
+      toast.warning(`SLA Escalation: ${levelName}`, {
+        description: `${contactName} has been waiting since ${new Date(payload.waiting_since).toLocaleTimeString()}`,
+        duration: 10000,
         action: {
           label: 'View',
           onClick: () => router.push('/chatbot/transfers')
