@@ -252,6 +252,7 @@ const allNavItems = [
     roles: ['admin', 'manager'],
     children: [
       { name: 'General', path: '/settings', icon: Settings },
+      { name: 'Chatbot', path: '/settings/chatbot', icon: Bot },
       { name: 'Accounts', path: '/settings/accounts', icon: Users },
       { name: 'Canned Responses', path: '/settings/canned-responses', icon: MessageSquareText },
       { name: 'Teams', path: '/settings/teams', icon: Users },

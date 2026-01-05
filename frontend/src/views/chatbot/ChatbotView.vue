@@ -238,7 +238,7 @@ const statCards = [
                 <CardTitle>Current Configuration</CardTitle>
                 <CardDescription>Overview of your chatbot settings</CardDescription>
               </div>
-              <RouterLink to="/settings">
+              <RouterLink to="/settings/chatbot">
                 <Button variant="outline" size="sm">
                   <Settings class="h-4 w-4 mr-2" />
                   Edit Settings

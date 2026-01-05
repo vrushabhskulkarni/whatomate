@@ -90,7 +90,7 @@ const router = createRouter({
         },
         {
           path: 'chatbot/settings',
-          redirect: '/settings'
+          redirect: '/settings/chatbot'
         },
         {
           path: 'chatbot/keywords',
@@ -126,6 +126,12 @@ const router = createRouter({
           path: 'settings',
           name: 'settings',
           component: () => import('@/views/settings/SettingsView.vue'),
+          meta: { roles: ['admin', 'manager'] }
+        },
+        {
+          path: 'settings/chatbot',
+          name: 'chatbot-settings',
+          component: () => import('@/views/settings/ChatbotSettingsView.vue'),
           meta: { roles: ['admin', 'manager'] }
         },
         {
