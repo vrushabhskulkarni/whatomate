@@ -1024,7 +1024,7 @@ async function sendMediaMessage() {
         </div>
 
         <!-- Messages -->
-        <ScrollArea ref="messagesScrollAreaRef" class="flex-1 p-3">
+        <ScrollArea ref="messagesScrollAreaRef" class="flex-1 p-3 chat-background">
           <div class="space-y-2">
             <!-- Loading indicator for older messages -->
             <div v-if="contactsStore.isLoadingOlderMessages" class="flex justify-center py-2">
