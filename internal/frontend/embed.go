@@ -39,6 +39,7 @@ var cachedIndexHTML []byte
 
 // Handler returns a fasthttp handler that serves the embedded frontend files
 // basePath should be empty string for root deployment or "/subpath" for subdirectory
+// If frontend is not embedded, returns a handler that shows a helpful message
 func Handler(basePath string) fasthttp.RequestHandler {
 	// Normalize base path
 	basePath = strings.TrimSuffix(basePath, "/")
@@ -46,13 +47,13 @@ func Handler(basePath string) fasthttp.RequestHandler {
 	// Get the dist subdirectory
 	distSubFS, err := fs.Sub(distFS, "dist")
 	if err != nil {
-		panic("failed to get dist subdirectory: " + err.Error())
+		return notEmbeddedHandler("Frontend not embedded: " + err.Error())
 	}
 
 	// Read and modify index.html to inject base path
 	indexContent, err := fs.ReadFile(distSubFS, "index.html")
 	if err != nil {
-		panic("failed to read index.html: " + err.Error())
+		return notEmbeddedHandler("Frontend not embedded: index.html not found. Run 'make build-prod' to embed frontend.")
 	}
 
 	// Inject base tag right after <head> so it's processed before any relative URLs
@@ -139,4 +140,13 @@ func IsEmbedded() bool {
 		return false
 	}
 	return len(entries) > 0
+}
+
+// notEmbeddedHandler returns a handler that displays a message when frontend is not embedded
+func notEmbeddedHandler(message string) fasthttp.RequestHandler {
+	return func(ctx *fasthttp.RequestCtx) {
+		ctx.SetContentType("text/plain; charset=utf-8")
+		ctx.SetStatusCode(fasthttp.StatusNotFound)
+		ctx.WriteString(message)
+	}
 }
