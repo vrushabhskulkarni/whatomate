@@ -14,7 +14,8 @@ import (
 )
 
 var (
-	configPath = flag.String("config", "config.toml", "Path to config file")
+	configPath   = flag.String("config", "config.toml", "Path to config file")
+	workerCount  = flag.Int("workers", 1, "Number of workers to run")
 )
 
 func main() {
@@ -60,12 +61,6 @@ func main() {
 	}
 	lo.Info("Connected to Redis")
 
-	// Create worker
-	w, err := worker.New(cfg, db, rdb, lo)
-	if err != nil {
-		lo.Fatal("Failed to create worker", "error", err)
-	}
-
 	// Setup context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -74,11 +69,24 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	// Run worker in goroutine
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- w.Run(ctx)
-	}()
+	// Create and run workers
+	workers := make([]*worker.Worker, *workerCount)
+	errCh := make(chan error, *workerCount)
+
+	for i := 0; i < *workerCount; i++ {
+		w, err := worker.New(cfg, db, rdb, lo)
+		if err != nil {
+			lo.Fatal("Failed to create worker", "error", err, "worker_num", i+1)
+		}
+		workers[i] = w
+
+		go func(workerNum int) {
+			lo.Info("Worker started", "worker_num", workerNum)
+			errCh <- w.Run(ctx)
+		}(i + 1)
+	}
+
+	lo.Info("Workers started", "count", *workerCount)
 
 	// Wait for shutdown signal or error
 	select {
@@ -87,14 +95,19 @@ func main() {
 		cancel()
 	case err := <-errCh:
 		if err != nil && err != context.Canceled {
-			lo.Fatal("Worker error", "error", err)
+			lo.Error("Worker error", "error", err)
+			cancel()
 		}
 	}
 
 	// Cleanup
-	lo.Info("Shutting down worker...")
-	if err := w.Close(); err != nil {
-		lo.Error("Error closing worker", "error", err)
+	lo.Info("Shutting down workers...")
+	for _, w := range workers {
+		if w != nil {
+			if err := w.Close(); err != nil {
+				lo.Error("Error closing worker", "error", err)
+			}
+		}
 	}
-	lo.Info("Worker stopped")
+	lo.Info("Workers stopped")
 }
