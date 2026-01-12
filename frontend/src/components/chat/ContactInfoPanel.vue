@@ -85,7 +85,7 @@ function startResize(e: MouseEvent) {
   document.addEventListener('mouseup', onMouseUp)
 }
 
-// Fetch session data when contact changes
+// Fetch session data when panel opens (contact changes)
 watch(() => props.contact.id, async (newId) => {
   if (newId) {
     await fetchSessionData()

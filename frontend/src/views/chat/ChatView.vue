@@ -438,16 +438,6 @@ async function selectContact(id: string) {
       setupScrollListener()
     }, 50)
 
-    // Auto-open contact info panel if panel sections are configured
-    try {
-      const response = await contactsService.getSessionData(id)
-      const sessionData = response.data.data || response.data
-      if (sessionData?.panel_config?.sections?.length > 0) {
-        isInfoPanelOpen.value = true
-      }
-    } catch {
-      // Ignore errors - panel just won't auto-open
-    }
   }
 }
 
